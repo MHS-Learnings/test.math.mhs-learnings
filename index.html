@@ -199,7 +199,7 @@
             { rank: 5, name: 'Syeda Maryam', roll: 'MHS-2026-10059', grade: 'Grade 11 (Pre-Medical)', city: 'Rawalpindi', score: 56.5, totalMarks: 60, percentage: 94.1, certId: 'BIO-2026-9015' }
         ];
 
-        // SPECIFIC BIOLOGY CANDIDATES DATABASE - SCHOOL/ACADEMY REMOVED
+        // SPECIFIC BIOLOGY CANDIDATES DATABASE (PERMANENTLY FIXED AT 51 / 60 MARKS)
         const SPECIFIC_RESULTS = {
             'mhs-2026-10179': {
                 name: 'Candidate Student',
@@ -1289,7 +1289,6 @@
             const [searchedResult, setSearchedResult] = useState(null);
             const [errorMsg, setErrorMsg] = useState('');
 
-            // Do not execute automatic lookup on mount - wait for explicit user search
             useEffect(() => {
                 setSearchedResult(null);
             }, []);
@@ -1305,12 +1304,13 @@
                 }
 
                 if (type === 'roll') {
-                    // Check direct match in predefined list
+                    // 1. Check direct match in predefined fixed list (MHS-2026-10179 & MHS-2026-10183 are fixed at 51)
                     if (SPECIFIC_RESULTS[cleanQuery]) {
                         setSearchedResult(SPECIFIC_RESULTS[cleanQuery]);
                         return;
                     }
-                    // Check top merit list
+
+                    // 2. Check top merit list (56+ toppers)
                     const foundMerit = MERIT_LEADERBOARD.find(r => r.roll.toLowerCase() === cleanQuery);
                     if (foundMerit) {
                         setSearchedResult({
@@ -1326,7 +1326,7 @@
                         return;
                     }
                 } else {
-                    // Search by student name
+                    // Check search by student name
                     const foundMerit = MERIT_LEADERBOARD.find(r => r.name.toLowerCase().includes(cleanQuery));
                     if (foundMerit) {
                         setSearchedResult({
@@ -1341,7 +1341,6 @@
                         });
                         return;
                     }
-                    // Check custom named candidates
                     for (let key in SPECIFIC_RESULTS) {
                         if (SPECIFIC_RESULTS[key].name.toLowerCase().includes(cleanQuery)) {
                             setSearchedResult(SPECIFIC_RESULTS[key]);
@@ -1350,22 +1349,47 @@
                     }
                 }
 
-                // Default generated result for dynamic roll/name queries
+                // 3. For any other roll number / name, generate a deterministic score strictly between 41 and 55.
+                // Using character polynomial hashing ensures the output is ALWAYS identical for the same input.
+                let hash = 0;
+                for (let i = 0; i < cleanQuery.length; i++) {
+                    hash = (hash << 5) - hash + cleanQuery.charCodeAt(i);
+                    hash |= 0;
+                }
+                const positiveHash = Math.abs(hash);
+
+                // Score range: 41 to 55 inclusive (15 possible values)
+                const calculatedScore = 41 + (positiveHash % 15);
+                const calculatedPercentage = ((calculatedScore / 60) * 100).toFixed(1);
+                
+                // Rank calculation between 30 and 250
+                const calculatedRank = 30 + (positiveHash % 220);
+                const isPassed = calculatedScore >= 30;
+
+                // Breakdown of 3 subject modules based on deterministic hash
+                const d1 = 13 + (positiveHash % 6); // 13-18
+                const d2 = 13 + ((positiveHash >> 2) % 6); // 13-18
+                const d3 = calculatedScore - d1 - d2;
+
+                // Selected sample cities for realism
+                const cities = ['Lahore', 'Karachi', 'Islamabad', 'Faisalabad', 'Multan', 'Rawalpindi', 'Peshawar', 'Quetta'];
+                const assignedCity = cities[positiveHash % cities.length];
+
                 setSearchedResult({
-                    name: type === 'name' ? queryStr : 'Verified Biology Candidate',
-                    roll: type === 'roll' ? queryStr.toUpperCase() : 'MHS-2026-10199',
-                    grade: 'Grade 12 (Biology Stream)',
-                    city: 'Lahore',
-                    score: 51,
+                    name: type === 'name' ? queryStr : 'Biology Championship Candidate',
+                    roll: type === 'roll' ? queryStr.toUpperCase() : `MHS-2026-${10000 + (positiveHash % 8999)}`,
+                    grade: 'Grade 12 (Pre-Medical)',
+                    city: assignedCity,
+                    score: calculatedScore,
                     totalMarks: 60,
-                    percentage: 85.0,
-                    status: 'PASSED (QUALIFIED)',
-                    rank: '48',
-                    certId: 'BIO-2026-10199',
+                    percentage: calculatedPercentage,
+                    status: isPassed ? 'PASSED (QUALIFIED)' : 'NOT QUALIFIED',
+                    rank: `${calculatedRank}`,
+                    certId: `BIO-2026-${10000 + (positiveHash % 8999)}`,
                     subjectBreakdown: [
-                        { subject: 'Cell Biology & Molecular Genetics', marks: '17 / 20' },
-                        { subject: 'Human Physiology & Anatomy', marks: '18 / 20' },
-                        { subject: 'Ecology & Biotechnology', marks: '16 / 20' }
+                        { subject: 'Cell Biology & Molecular Genetics', marks: `${d1} / 20` },
+                        { subject: 'Human Physiology & Anatomy', marks: `${d2} / 20` },
+                        { subject: 'Ecology & Biotechnology', marks: `${d3} / 20` }
                     ]
                 });
             };
